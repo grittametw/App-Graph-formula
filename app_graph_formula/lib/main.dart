@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'dart:math'; // สำหรับการใช้งานฟังก์ชัน pow
 
 void main() {
   runApp(MyApp());
@@ -22,16 +23,24 @@ class FormulaGraphScreen extends StatefulWidget {
 class _GraphPageState extends State<FormulaGraphScreen> {
   double tms = 0;
   double i = 0;
-  double isValue = 1; // Set initial value to avoid division by zero
+  double isValue = 1;
   List<FlSpot> dataPoints = [];
 
   // Function to calculate t based on user inputs
   void calculateAndDrawGraph() {
+    dataPoints.clear(); // เคลียร์ข้อมูลเก่าก่อน
+
     double ir = i / isValue;
-    double t = tms * (80 / (ir * ir - 1));
-    setState(() {
-      dataPoints.add(FlSpot(ir, t));
-    });
+
+    // ตรวจสอบเพื่อหลีกเลี่ยงค่าที่ไม่ถูกต้อง
+    if (ir > 1) {
+      double t = tms * (0.14 / (pow(ir, 0.2) - 1));
+      if (t > 0) {
+        dataPoints.add(FlSpot(ir, t));
+      }
+    }
+
+    setState(() {});
   }
 
   @override
@@ -44,7 +53,6 @@ class _GraphPageState extends State<FormulaGraphScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Input fields for TMS, I, and Is
             TextField(
               decoration: const InputDecoration(labelText: 'TMS'),
               keyboardType: TextInputType.number,
@@ -81,15 +89,15 @@ class _GraphPageState extends State<FormulaGraphScreen> {
             Expanded(
               child: LineChart(
                 LineChartData(
-                  minX: 0,
-                  minY: 0,
+                  minX: 1, // แกน X (Ir) เริ่มที่ 1
+                  minY: 0, // แกน Y (t) เริ่มที่ 0
                   lineBarsData: [
                     LineChartBarData(
                       spots: dataPoints,
-                      isCurved: true,
+                      isCurved: true, // ให้เส้นกราฟมีความโค้ง
                       color: Colors.blue,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(show: false),
+                      dotData: const FlDotData(show: true), // แสดงจุดบนกราฟ
+                      belowBarData: BarAreaData(show: false), // ไม่แสดงแถบใต้เส้นกราฟ
                     ),
                   ],
                   titlesData: FlTitlesData(
