@@ -1,131 +1,193 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'dart:math'; // สำหรับการใช้งานฟังก์ชัน pow
+import 'package:fl_chart/fl_chart.dart';
+import 'dart:math';
 
-void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: FormulaGraphScreen(),
-    );
-  }
-}
-
-class FormulaGraphScreen extends StatefulWidget {
+class GraphPage extends StatefulWidget {
   @override
   _GraphPageState createState() => _GraphPageState();
 }
 
-class _GraphPageState extends State<FormulaGraphScreen> {
-  double tms = 0;
-  double i = 0;
-  double isValue = 1;
-  List<FlSpot> dataPoints = [];
+class _GraphPageState extends State<GraphPage> {
+  final TextEditingController _tmsController = TextEditingController();
+  final TextEditingController _iController = TextEditingController();
+  final TextEditingController _isController = TextEditingController();
 
-  // Function to calculate t based on user inputs
-  void calculateAndDrawGraph() {
-    dataPoints.clear(); // เคลียร์ข้อมูลเก่าก่อน
+  double? _calculatedT;
+  double? _calculatedIr; // For storing Ir value
+  int _selectedFormula = 0;
+  List<FlSpot> _spots = []; // Store (Ir, t) for plotting
 
-    double ir = i / isValue;
+  void _calculateT() {
+    double tms = double.tryParse(_tmsController.text) ?? 0;
+    double I = double.tryParse(_iController.text) ?? 0;
+    double Is = double.tryParse(_isController.text) ?? 1;
+    double ir = I / Is; // Calculate Ir
+    double t = 0;
 
-    // ตรวจสอบเพื่อหลีกเลี่ยงค่าที่ไม่ถูกต้อง
-    if (ir > 1) {
-      double t = tms * (0.14 / (pow(ir, 0.2) - 1));
-      if (t > 0) {
-        dataPoints.add(FlSpot(ir, t));
-      }
+    switch (_selectedFormula) {
+      case 0:
+        t = tms * (0.14 / (pow(ir, 0.02) - 1));
+        break;
+      case 1:
+        t = tms * (13.5 / (ir - 1));
+        break;
+      case 2:
+        t = tms * (80 / (pow(ir, 2) - 1));
+        break;
+      case 3:
+        t = tms * (120 / (ir - 1));
+        break;
     }
 
-    setState(() {});
+    setState(() {
+      _calculatedT = t;
+      _calculatedIr = ir;
+
+      // Generate data points for plotting (Ir, t)
+      _spots = List.generate(
+        100, // Adjust this value to increase/decrease the number of points
+        (index) {
+          double currentIr = (I / (Is + index * 0.1))
+              .clamp(0.01, double.infinity); // Avoid division by zero
+          double currentT = 0;
+
+          // Calculate t for currentIr using the selected formula
+          switch (_selectedFormula) {
+            case 0:
+              currentT = tms * (0.14 / (pow(currentIr, 0.02) - 1));
+              break;
+            case 1:
+              currentT = tms * (13.5 / (currentIr - 1));
+              break;
+            case 2:
+              currentT = tms * (80 / (pow(currentIr, 2) - 1));
+              break;
+            case 3:
+              currentT = tms * (120 / (currentIr - 1));
+              break;
+          }
+          return FlSpot(currentIr, currentT);
+        },
+      );
+    });
+  }
+
+  Widget _buildGraph() {
+    return _calculatedT == null
+        ? Container()
+        : LineChart(
+            LineChartData(
+              lineBarsData: [
+                LineChartBarData(
+                  spots: _spots,
+                  isCurved: false,
+                  barWidth: 3,
+                  color: Colors.blue,
+                )
+              ],
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (value, meta) {
+                        return Text(value.toStringAsFixed(2)); // X-axis (Ir)
+                      }),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (value, meta) {
+                        return Text(value.toStringAsFixed(2)); // Y-axis (t)
+                      }),
+                ),
+              ),
+              gridData: FlGridData(show: true),
+              borderData: FlBorderData(show: true),
+            ),
+          );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Graph Plotting'),
+        title: Text('Inverse formula'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             TextField(
-              decoration: const InputDecoration(labelText: 'TMS'),
+              controller: _tmsController,
               keyboardType: TextInputType.number,
-              onChanged: (value) {
-                setState(() {
-                  tms = double.tryParse(value) ?? 0;
-                });
-              },
+              decoration: InputDecoration(labelText: 'TMS'),
             ),
             TextField(
-              decoration: const InputDecoration(labelText: 'I'),
+              controller: _iController,
               keyboardType: TextInputType.number,
-              onChanged: (value) {
-                setState(() {
-                  i = double.tryParse(value) ?? 0;
-                });
-              },
+              decoration: InputDecoration(labelText: 'I'),
             ),
             TextField(
-              decoration: const InputDecoration(labelText: 'Is'),
+              controller: _isController,
               keyboardType: TextInputType.number,
+              decoration: InputDecoration(labelText: 'Is'),
+            ),
+            SizedBox(height: 20),
+            DropdownButton<int>(
+              value: _selectedFormula,
               onChanged: (value) {
                 setState(() {
-                  isValue = double.tryParse(value) ?? 1;
+                  _selectedFormula = value!;
                 });
               },
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: calculateAndDrawGraph,
-              child: const Text('Calculate & Draw Graph'),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: LineChart(
-                LineChartData(
-                  minX: 1, // แกน X (Ir) เริ่มที่ 1
-                  minY: 0, // แกน Y (t) เริ่มที่ 0
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: dataPoints,
-                      isCurved: true, // ให้เส้นกราฟมีความโค้ง
-                      color: Colors.blue,
-                      dotData: const FlDotData(show: true), // แสดงจุดบนกราฟ
-                      belowBarData: BarAreaData(show: false), // ไม่แสดงแถบใต้เส้นกราฟ
-                    ),
-                  ],
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 22,
-                        getTitlesWidget: (value, meta) {
-                          return Text(value.toStringAsFixed(2));
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 22,
-                        getTitlesWidget: (value, meta) {
-                          return Text(value.toStringAsFixed(2));
-                        },
-                      ),
-                    ),
-                  ),
+              items: [
+                DropdownMenuItem(
+                  value: 0,
+                  child: Text('Formula 1: TMS * [0.14 / [(Ir^0.02) - 1]]'),
                 ),
+                DropdownMenuItem(
+                  value: 1,
+                  child: Text('Formula 2: TMS * [13.5 / (Ir - 1)]'),
+                ),
+                DropdownMenuItem(
+                  value: 2,
+                  child: Text('Formula 3: TMS * [80 / [(Ir^2) - 1]]'),
+                ),
+                DropdownMenuItem(
+                  value: 3,
+                  child: Text('Formula 4: TMS * [120 / (Ir - 1)]'),
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _calculateT,
+              child: Text('Calculate t and Plot Graph'),
+            ),
+            SizedBox(height: 20),
+            if (_calculatedT != null && _calculatedIr != null)
+              Text(
+                't = ${_calculatedT!.toStringAsFixed(2)}, Ir = ${_calculatedIr!.toStringAsFixed(2)}',
+                style: DefaultTextStyle.of(context)
+                    .style
+                    .apply(fontSizeFactor: 0.4),
               ),
+            SizedBox(height: 20),
+            Expanded(
+              child: _buildGraph(),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+void main() {
+  runApp(MaterialApp(
+    home: GraphPage(),
+    debugShowCheckedModeBanner: false,
+  ));
 }
