@@ -48,7 +48,7 @@ class _GraphPageState extends State<GraphPage> {
         100, // Adjust this value to increase/decrease the number of points
         (index) {
           double currentIr = (I / (Is + index * 0.1))
-              .clamp(0.01, double.infinity); // Avoid division by zero
+              .clamp(0.01, 100.0); // Avoid extremely small or large values
           double currentT = 0;
 
           // Calculate t for currentIr using the selected formula
@@ -66,9 +66,17 @@ class _GraphPageState extends State<GraphPage> {
               currentT = tms * (120 / (currentIr - 1));
               break;
           }
+
+          // Avoid plotting NaN or Infinity values
+          if (currentT.isNaN || currentT.isInfinite) {
+            return null; // Skip invalid points
+          }
           return FlSpot(currentIr, currentT);
         },
-      );
+      )
+          .where((spot) => spot != null)
+          .toList()
+          .cast<FlSpot>(); // Remove null points
     });
   }
 
